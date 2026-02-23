@@ -4,6 +4,7 @@ import path from 'path';
 import type { Session, SessionsData } from '@/types/sessions';
 
 const STALE_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
+const HIDE_OLD_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function parseTimestamp(ts: string): number {
   // Timestamps like "2026-02-22 16:47:01" — parse as local time
@@ -57,6 +58,7 @@ export async function GET() {
           project: projectName,
           status: 'active',
           startTime: timestamp,
+          lastActivityTime: timestamp,
           details: details || '',
         });
         openByProject[projectName] = idx;
@@ -67,6 +69,7 @@ export async function GET() {
       const openIdx = openByProject[projectName];
       if (openIdx === undefined) continue; // no open session to apply to
       const session = allSessions[openIdx];
+      session.lastActivityTime = timestamp;
 
       switch (action) {
         case 'PAUSED':
@@ -92,12 +95,12 @@ export async function GET() {
       }
     }
 
-    // Mark stale: any active/paused session older than 4 hours → "stale"
+    // Mark stale: any active/paused session with no activity for 4+ hours → "stale"
     const now = Date.now();
     for (const session of allSessions) {
       if (session.status === 'active' || session.status === 'paused') {
-        const startMs = parseTimestamp(session.startTime);
-        if (startMs > 0 && now - startMs > STALE_THRESHOLD_MS) {
+        const lastMs = parseTimestamp(session.lastActivityTime || session.startTime);
+        if (lastMs > 0 && now - lastMs > STALE_THRESHOLD_MS) {
           session.status = 'stale';
           session.details = session.details
             ? `${session.details} (no update in 4+ hours)`
@@ -106,10 +109,13 @@ export async function GET() {
       }
     }
 
+    // Hide interrupted/completed sessions older than 24 hours
+    const cutoff = now - HIDE_OLD_THRESHOLD_MS;
+
     const active = allSessions.filter((s) => s.status === 'active');
     const paused = allSessions.filter((s) => s.status === 'paused');
-    const completed = allSessions.filter((s) => s.status === 'completed');
-    const exited = allSessions.filter((s) => s.status === 'exited');
+    const completed = allSessions.filter((s) => s.status === 'completed' && parseTimestamp(s.endTime || s.startTime) > cutoff);
+    const exited = allSessions.filter((s) => s.status === 'exited' && parseTimestamp(s.endTime || s.startTime) > cutoff);
     const stale = allSessions.filter((s) => s.status === 'stale');
 
     const sortByTime = (a: Session, b: Session) => {

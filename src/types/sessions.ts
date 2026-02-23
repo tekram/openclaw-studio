@@ -3,6 +3,7 @@ export interface Session {
   status: 'active' | 'paused' | 'completed' | 'exited' | 'stale';
   startTime: string;
   endTime?: string;
+  lastActivityTime?: string;
   details?: string;
 }
 
