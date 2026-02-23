@@ -92,7 +92,7 @@ export const FlowsSidebar = ({ client, gwStatus, isOpen, onToggle }: FlowsSideba
       {/* Tab content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'cron' && <CronTab client={client} gwStatus={gwStatus} />}
-        {activeTab === 'sessions' && <SessionsTab />}
+        {activeTab === 'sessions' && <SessionsTab isActive={activeTab === 'sessions'} />}
         {activeTab === 'todos' && <TodosTab />}
       </div>
     </div>
